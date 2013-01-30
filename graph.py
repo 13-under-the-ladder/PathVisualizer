@@ -1,33 +1,31 @@
 from collections import deque
 from sys import stderr
+from utils import *
 
 '''
-Note that when representing the path, it might be easier to represent it as a sequence of roads instead...
-Or not...
+This file deals with the "model" representation of the graph/road visualizer.
 '''
-
-def print_dict(d):
-    '''Return intuitive textual representation for a dict.'''
-    
-    s = ""
-    
-    for k, v in d.iteritems():
-        s += "{} ---> {}\n".format(k, v)
-        
-    return s
 
 class Graph(object):
-    
+    '''The graph object.'''
 
     def __init__(self):
+        '''Create a new graph object.'''
+        
+        # the queue of roads waiting to be added
         self._road_queue = deque()
+        # the queue of added roads, not including queued roads above
+        self._added_road_queue = deque()
         
-        #TODO for now
-        self._nodes = []#set([])
-        self._roads = set([])
-        self._adjacency_list = {}
-        
-        self._all_paths = set([])
+        # this is a list instead of a set for easy node labelling
+        self._nodes = [] # contains all nodes added or pending
+        # this is not strictly-speaking needed... or used ... 
+        self._roads = [] # contains all roads, added or pending
+        # maps each node to a list of other nodes that node is adjacent to
+        self._adjacency_list = {} # the representation by which paths are computed
+        # set of all paths in the graph
+        self._all_paths = set([]) 
+        # True if I have to recompute self._all_paths
         self._changed = False
         
     def adjacent_add(self, v1, v2):
@@ -42,15 +40,17 @@ class Graph(object):
         self._adjacency_list[v2].add(v1)
         
     def add_road(self, v1, v2):
-        # is that it???
+        '''This is a stub function for plug-and-play with pyCatan. Hope it has the right stuff in it...'''
+        
         self.adjacent_add(v1, v2)
     
     def queue_road(self, v1, v2):
+        '''Queue a road to be added.'''
+        
         road = (v1, v2)
         self._road_queue.append(road)
-        self._roads.add(road)
+        self._roads.append(road)
         
-        #TODO for now
         if v1 not in self._nodes:
             self._nodes.append(v1)
         if v2 not in self._nodes:
@@ -58,40 +58,35 @@ class Graph(object):
         
     def get_longest_path_length(self):
         '''Return the length of the longest path in this graph.
-        Makes sure all disconnected portions of the graph are visited.
-        Q: Accounts for cycles???'''
+        Makes sure all disconnected portions of the graph are visited.'''
         
         if self._changed:
+            # recompute paths
             self._all_paths = self.get_paths()
         
         if len(self._all_paths) == 0:
             return 0
         else:
-            print "::"
-            for path in self._all_paths:
-                #TODO for now
-                self.simple_print_path(path)
+#            for path in self._all_paths:
+#                print "P: " + self.path_to_str(path)
         
             # -1 because path_length = nodes_on_path - 1
             return max([len(path) for path in self._all_paths]) - 1
         
     def path_to_str(self, path):
-        return ", ".join([str(self._nodes.index(node)) for node in path])
+        '''Return string representation of the path based on the index of each node in the path.'''
         
-    def simple_print_path(self, path):
-        try:
-            print self.path_to_str(path)
-        except ValueError:
-#            print >>stderr, node
-            print >>stderr, self._nodes
+        return ", ".join([str(self._nodes.index(node)) for node in path])
             
     def path_to_roads(self, path):
+        '''Convert a path to a generator for roads, going node by node from beginning to end of path.'''
+        
         for i in range(len(path) - 1):
             yield (path[i], path[i + 1])
             
     def cut_loop(self, path):
-        '''Return None if cutting the loop leads to a retarded road.
-        Return the road resulting in cutting a loop.'''
+        '''Return None if cutting the loop leads to a retarded road (disconnected).
+        Return the path resulting in cutting a loop otherwise.'''
         
         roads = tuple(self.path_to_roads(path))
         new_roads = []
@@ -105,32 +100,27 @@ class Graph(object):
             elif not has_loop:
                 has_loop = True
         
-#        if has_loop:
-        new_path = [new_roads[0][0]]
-        # now make sure it still makes sense
-        for i in range(1, len(new_roads)):
-            if new_roads[i - 1][1] == new_roads[i][0]:
-                new_path.append(new_roads[i][0])
-            else:
-                return None
-                
-        return tuple(new_path + [new_roads[-1][1]])
-#        else:
-#            return path
+        # the has_loop variable isn't strictly necessary, but avoids extraneous computation
+        if has_loop:
+            new_path = [new_roads[0][0]]
+            # now make sure it still makes sense
+            for i in range(1, len(new_roads)):
+                if new_roads[i - 1][1] == new_roads[i][0]:
+                    new_path.append(new_roads[i][0])
+                else:
+                    return None
+                    
+            return tuple(new_path + [new_roads[-1][1]])
+        else:
+            return path
         
     def merge(self, v_seed, path_set):
-        '''Modify the pathset.'''
+        '''Modify the pathset. By looking for a merger of roads at node v_seed'''
         
-        print "*** start merge ***"
-        print "@ {}".format(self._nodes.index(v_seed))
-        
+#        print "*** start merge ***"
+#        print "@ {}".format(self._nodes.index(v_seed))
+#        combo = []
         path_list = list(path_set)
-        combo = []
-        
-        #TODO for debugging
-        print "Before merge:"
-        for p in path_list:
-            self.simple_print_path(p)
         
         for i in range(len(path_list)):
             for j in range(i + 1, len(path_list)):
@@ -140,62 +130,33 @@ class Graph(object):
                     index_j = path_list[j].index(v_seed)
                     p1_old = tuple(reversed(path_list[j][index_j : ])) + path_list[i][index_i + 1:]
                     p1 = self.cut_loop(p1_old)
-                    if p1_old != p1:
-                        print "L- " + self.path_to_str(p1_old)
-                        if p1:
-                            print "L+ " + self.path_to_str(p1)
-#                    # fixes looping
-#                    start_loop = end_loop = None
-#                    
-#                    # from the front
-#                    for node_i, node in enumerate(p1):
-#                        if p1.count(node) > 1:
-#                            if start_loop is None:
-#                                start_loop = node_i
-##                                print "L %d" % node_i 
-#                            end_loop = node_i
-#                        else:
-#                            break
-#                    if start_loop is None:
-#                        for node_i in range(len(p1) - 1, -1, -1):
-#                            node = p1[node_i]
-#                            if p1.count(node) > 1:
-#                                if start_loop is None:
-#                                    start_loop = node_i
-#                                end_loop = node_i
-#                            else:
-#                                break
-                        
-#                    if start_loop is not None and end_loop is not None:
-#                        if start_loop > 0 and p1.count(p1[-1]) == 1: 
-#                            # cannot cut in the middle of the thing
-#                            continue
-#                        print "L- " + self.path_to_str(p1)
-#                        p1 = p1[:start_loop] + p1[end_loop:]
-#                        print "L {}, {}".format(start_loop, end_loop)
-#                        print "L+ " + self.path_to_str(p1)
+#                    if p1_old != p1:
+#                        print "L- " + self.path_to_str(p1_old)
+#                        if p1:
+#                            print "L+ " + self.path_to_str(p1)
                     
                     if p1 is not None and self.can_merge(path_list[i], path_list[j], v_seed):
                         if index_i == index_j == 0:
-                            print "X %s" % self.path_to_str(path_list[i])
-                            print "X %s" % self.path_to_str(path_list[j])
+#                            print "X %s" % self.path_to_str(path_list[i])
+#                            print "X %s" % self.path_to_str(path_list[j])
                             path_set.discard(path_list[i])
                             path_set.discard(path_list[j])
                         if tuple(reversed(p1)) not in path_set:
                             path_set.add(p1)
-                        print "+ %s" % self.path_to_str(p1)
-                        combo.append(p1)
+#                        print "+ %s" % self.path_to_str(p1)
+#                        combo.append(p1)
         
-        if len(combo) > 0:
-            print "Result:"
-            for path in path_set:
-                self.simple_print_path(path)
-        print "*** end merge ***"
+#        print "*** end merge ***"
         
-    def get_all_paths(self, v_seed, path=None, visited=None):
-        root = (path is None)
+    def get_all_paths(self, v_seed, path=None, visited=None, root=True):
+        '''Return all the paths stemming from the given vertex.
+        Paths may not have loops, but may *be* a single loop.
+        v_seed - the seed vertex/node
+        path - the path from the root node to this node
+        visited - the set of visited nodes
+        root - whether is the root node'''
         
-        if root:
+        if path is None:
             path = []
         if visited is None:
             visited = set([])
@@ -212,6 +173,7 @@ class Graph(object):
                     
                     path_set.update(adj_path_set) # path is an extension of p_new
         except KeyError:
+            # should not happen, but for emergency, dump some info
             print >>stderr, "{} not in adjacency list".format(v_seed)
             print >>stderr, "Adjacency list:"
             print >>stderr, print_dict(self._adjacency_list)
@@ -228,38 +190,63 @@ class Graph(object):
         return path_set, visited
     
     def can_merge(self, p1, p2, mergept):
-        '''DO NOT MERGE CYCLES'''
+        '''You can merge two points at the mergept if:
+        - there is a mergept
+        - the paths go in different directions after leaving the mergept.'''
         
         ti_1 = p1.index(mergept)
         ti_2 = p2.index(mergept)
         return p1[ti_1] == p2[ti_2] and p1[ti_1 + 1] != p2[ti_2 + 1]
+    
+    def remove_last_road(self):
+        if len(self._added_road_queue) == 0:
+            return False
+        else:
+            r = self._added_road_queue.pop()
+            self._road_queue.appendleft(r)
+            self.remove_road(*r)
+            self._changed = True
+            return True
+        
+    def remove_road(self, v1, v2):
+        '''Remove the road given by (v1, v2) from the adjacency list.'''
+        
+        self._adjacency_list[v1].discard(v2)
+        self._adjacency_list[v2].discard(v1)
         
     def add_next_road(self):
+        '''Transfer a road from the queue and put it in the graph.
+        Return True if a new road was added, False otherwise.'''
+        
         if len(self._road_queue) == 0:
             return False
         else:
             r = self._road_queue.popleft()
-            print "#" * 20
-            
-            print "added :"
-            self.simple_print_path(r)
-            
+            self._added_road_queue.append(r)
+#            print "#" * 20
             self.add_road(*r)
             self._changed = True
             return True
         
     def get_num_roads_placed(self):
-        return len(self._roads) - len(self._road_queue)
+        '''Return the number of roads placed so far on the graph.'''
+        
+        return len(self._added_road_queue)
         
     def get_nodes(self):
+        '''Return a list of all the nodes in the graph.'''
+        
         return self._nodes
     
     def get_roads(self):
+        '''Return the set of all roads/edges in the graph - placed and queued'''
+        
         return self._roads
     
     def cleanup(self, path_set):
-        '''Runs in really bad time. Final cleanup operation to remove subsets.
-        Make sure when we talk about subsets, we are talking about roads, not vertices.'''
+        '''Only run right before return. Eliminates subsets caused by loops with branches.
+        Runs in really bad time. Final cleanup operation to remove subsets.
+        When we talk about subsets, we are talking about roads, not vertices.'''
         
         sorted_path_list = sorted(path_set, key=tuple.__len__)
         full_path_list = []
@@ -278,11 +265,14 @@ class Graph(object):
             for j in range(len(full_path_list) - 1, i, -1):
                 if full_path_list[i].issubset(full_path_list[j]):
                     path_set.discard(sorted_path_list[i])
-                    print "- " + self.path_to_str(sorted_path_list[i])
+#                    print "- " + self.path_to_str(sorted_path_list[i])
     
     def get_paths(self):
+        '''Return a set of all paths found in this graph.
+        Save this, and return the same set until more queued roads are placed on the graph.'''
+        
         if self._changed:
-            d = set(self._adjacency_list.keys())
+            d = set(filter(lambda x: len(self._adjacency_list[x]) > 0, self._adjacency_list.keys()))
             self._all_paths = set([])
             
             while len(d) > 0:
@@ -293,8 +283,10 @@ class Graph(object):
                 
             self._changed = False
         
-        #for p in self._all_paths:
-        #    print p
+        if len(self._all_paths) > 0:
+            print "#" * 50
+            for p in self._all_paths:
+                print self.path_to_str(p)
         return self._all_paths
                     
 if __name__ == "__main__":

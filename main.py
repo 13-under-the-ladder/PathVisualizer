@@ -3,6 +3,11 @@ from path_graphics import PathDrawer
 from Tkinter import Tk
 from graph import Graph
 
+'''
+The double-hexagon reveals a problem in my program: it doesn't detect the figure-8 path.
+Not sure what causes this bug, but it's not really a priority.
+'''
+
 def connect_nodes(nodes):
     '''Connect the nodes consecutively.'''
     
@@ -42,6 +47,8 @@ def create_road_nexus():
     return roads
 
 def create_double_hexagon():
+    '''Create a figure-8.'''
+    
     # first settlement and associated building
     v1 = [
         (100, 100),
@@ -58,8 +65,8 @@ def create_double_hexagon():
     v2 = [
         (100, 200),
         (200, 200),
-        (250, 250),
-        (200, 300)
+        (250, 250)#,
+        #(200, 300)
     ]
     
     

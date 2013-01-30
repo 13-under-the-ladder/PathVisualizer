@@ -90,6 +90,18 @@ class PathDrawer(Frame):
             textvar=self._longest_road
         )
         
+    def remove_last_road(self):
+        '''Remove the last added road.'''
+        
+        self._engine.remove_last_road()
+        self.set_longest_road_length()
+        
+        # remove the paths already on the canvas
+        for item in self._canvas.find_withtag("path"):
+            self._canvas.delete(item)
+            
+        self.draw_paths()
+        
     def add_road_buttons(self):
         '''Add a button to control addition of new roads.'''
         
@@ -99,8 +111,15 @@ class PathDrawer(Frame):
             command=self.add_next_road
         )
         
+        self._no_road_button = Button(
+            self,
+            text="Remove Road",
+            command=self.remove_last_road
+        )
+        
         # more or less arbitrary placement
         self._canvas.create_window(100, 500, window=self._road_button, anchor=S)
+        self._canvas.create_window(300, 500, window=self._no_road_button, anchor=S)
         self._canvas.create_window(200, 550, window=self.create_longest_road_label(), anchor=E)
         self._canvas.create_window(400, 550, window=self.create_num_roads_placed_label(), anchor=E)
         
@@ -131,12 +150,18 @@ class PathDrawer(Frame):
             tags="road" if index == 0 else "path"
         )
         
+        # also label the roads
+        if index == 0:
+            n = self._engine.get_roads().index((v1, v2))
+            l = Label(self, text=str(n))
+            self._canvas.create_window((v1[0] + v2[0]) / 2, (v1[1] + v2[1]) / 2 + 5, window=l)
+        
     def draw_node(self, v):
         '''Draw a node at v.'''
         
         n = self._engine.get_nodes().index(v)
         
-        l = Label(self, text=str(n))
-        self._canvas.create_window(v[0] - self._node_radius - 10, v[1] - self._node_radius - 10, window=l)
+        l = Label(self, text=chr(n + 65))
+        self._canvas.create_window(v[0] - self._node_radius, v[1] - self._node_radius - 15, window=l)
         self._canvas.create_oval(v[0] + self._node_radius, v[1] + self._node_radius, v[0] - self._node_radius, v[1] - self._node_radius, fill="black")
         
