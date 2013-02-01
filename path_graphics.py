@@ -20,10 +20,10 @@ class PathDrawer(Frame):
 	_node_radius = 10
 	
 	# distance between paths
-	_road_offset = 3
+	_road_offset = 5
 	
 	# colors for paths
-	_path_colors = ["black", "orange",  "purple", "cyan", "green", "grey", "lightgreen", "yellow", "blue"]
+	_path_colors = ["powder blue", "orange",  "purple", "cyan", "green", "grey", "coral1", "blue", "misty rose", "sandy brown", "red", "lightgreen"]
 	
 	_node_colors = {
 		"unvisited" : "white",
@@ -158,7 +158,9 @@ class PathDrawer(Frame):
 		TODO for now turn into step...'''
 		
 		self._engine.add_road()
+		self.disable_vis_debugger() # just to get the label right 
 		self._road_step_button.config(state=NORMAL)
+		self._no_road_button.config(state=NORMAL)
 		
 		while self._engine.next_step():
 			pass
@@ -170,6 +172,23 @@ class PathDrawer(Frame):
 		if not self._engine.can_add_road():
 			self._road_button.config(state=DISABLED)
 		
+	def remove_last_road(self):
+		'''Remove the last added road.'''
+		
+		self._engine.remove_last_road()
+		self.disable_vis_debugger() # just to get the label right 
+		self._road_step_button.config(state=NORMAL)
+		self._road_button.config(state=NORMAL)
+		
+		while self._engine.next_step():
+			pass
+		
+		self.set_longest_road_length()
+		self.update_nodes()
+		self.redraw_graph()
+		
+		if not self._engine.can_remove_road():
+			self._no_road_button.config(state=DISABLED)
 			
 	def draw_paths(self):
 		'''Draw all the paths as a series of roads.
@@ -181,7 +200,7 @@ class PathDrawer(Frame):
 			#for road_index in range(len(path) - 1):
 			#self.draw_road(path[road_index], path[road_index + 1], path_index + 1)
 			for road in path:
-				self.draw_road(road[0], road[1], path_index + 1)
+				self.draw_road(road[0], road[1], path_index + 1, color=self._path_colors[path_index % len(self._path_colors)])
 				
 		#print "**** Drawing ****"
 		#for p in self._paths:
@@ -196,15 +215,6 @@ class PathDrawer(Frame):
 			self,
 			textvar=self._longest_road
 		)
-		
-	def remove_last_road(self):
-		'''Remove the last added road.'''
-		
-		self._engine.remove_last_road()
-		self.set_longest_road_length()
-		self.update_nodes()
-		self.set_longest_road_length()
-		self.redraw_graph()
 		
 	def add_road_buttons(self):
 		'''Add a button to control addition of new roads.'''
@@ -258,7 +268,7 @@ class PathDrawer(Frame):
 		for node in nodelist:
 			self.draw_node(node)
 			
-	def draw_road(self, v1, v2, index=0):
+	def draw_road(self, v1, v2, index=0, color="black"):
 		'''Draw a road from v1 to v2, colors are optional.
 		The index refers to the offset from the other roads.'''
 		
@@ -267,8 +277,8 @@ class PathDrawer(Frame):
 			v1[1] + index * self._road_offset, 
 			v2[0], 
 			v2[1] + index * self._road_offset, 
-			fill=self._path_colors[index % len(self._path_colors)], 
-			width=1.5, 
+			fill=color,
+			width=2.0, 
 			tags="road" if index == 0 else "path"
 		)
 		
@@ -283,7 +293,7 @@ class PathDrawer(Frame):
 		
 		n = self._engine.get_nodes().index(v)
 		
-		l = Label(self, text=str(n))#chr(n + 65))
+		l = Label(self, text=self._engine.get_node_label(n))
 		self._canvas.create_window(v[0] - self._node_radius, v[1] - self._node_radius - 15, window=l)
 		self._node_sprites.append(
 			self._canvas.create_oval(

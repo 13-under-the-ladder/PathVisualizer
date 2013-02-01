@@ -204,7 +204,7 @@ if __name__ == "__main__":
 	
 	# for road in create_double_hexagon():
 		# graph.queue_road(*road)
-	load_loop(graph)
+	load_ship_wheel(graph)
 	
 	
 	g = PathDrawer(root, graph)

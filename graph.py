@@ -6,28 +6,39 @@ class Graph():
 		# internal graph representation
 		self._adjacency_list = {}
 	
+		self._prev_ps = []
+		self._ps = []
+	
 		self.reset_path_search_vars()
 		
 		self._road_list = []
 		self._node_list = []
 		self._added_index = 0
+	
+		self._translation = None
+		
+	def set_translation(self, t):
+		self._translation = t
 		
 	def path_to_nodes(self, path):
+		'''Return the a list of nodes (in order) along the length of this path.'''
+	
 		nodes = []
 		
 		for road in path:
 			nodes.append(road[0])
 			
-		nodes.append(path[-1][1])
+		if len(path) > 0:
+			nodes.append(path[-1][1])
 		return nodes
 		
 	def merge_at_node(self, node):
 		'''Try to merge everything in self._ps at the given road.'''
 		
-		path_list = list(self._ps)
+		# path_list = list(self._ps)
 		# m = False
 		
-		for i, p1 in enumerate(path_list):
+		for i, p1 in enumerate(self._ps):
 			p1_nodes = self.path_to_nodes(p1)
 			# print p1_nodes
 		
@@ -35,7 +46,7 @@ class Graph():
 				# print "{} not in {}".format(node, p1_nodes)
 				continue
 		
-			for j, p2 in enumerate(path_list[i + 1:]):
+			for j, p2 in enumerate(self._ps[i + 1:]):
 				p2_nodes = self.path_to_nodes(p2)
 				# print ":", 
 				# print p2_nodes
@@ -51,16 +62,53 @@ class Graph():
 				
 				# m = True
 				
-				# create a new path
-				p_new = tuple([tuple(reversed(road)) for road in p1[p1_i:]])
-				p_new += p2[p2_i:]
-				# print "+ {}".format(p_new)
-				self._ps.add(p_new)
+				if self.can_merge(p1[p1_i:], p2[p2_i:]):
+					# create a new path
+					p_new = tuple([tuple(reversed(road)) for road in p1[p1_i:]])
+					p_new += p2[p2_i:]
+					# print "+ {}".format(p_new)
+					if not self.is_connected(p_new):
+						print "** Tried to merge {} and {} @ {}".format(p1, p2, node)
+						print "** Got disconncted road {}".format(p_new)
+						print "** {} + {}".format(tuple([tuple(reversed(road)) for road in p1[p1_i:]]), p2[p2_i:])
+					self.add_to_path_set(p_new)
 				
 		# if not m:
 			# print "No merge occured"
 		# else:
 			# print "hooray for merge!"
+			
+	def is_connected(self, path):
+		'''Return True iff the given path is connected.'''
+		
+		for i in range(len(path) - 1):
+			if path[i][1] != path[i + 1][0]: # obviously 2 endpoints don't matter
+				return False
+		return True
+			
+	def add_to_path_set(self, new_path):
+		if new_path in self._ps:
+			return False
+		else:
+			if new_path in self._prev_ps and self._prev_ps.index(new_path) < len(self._ps):
+				self._ps.insert(self._prev_ps.index(new_path), new_path)
+			else:
+				self._ps.append(new_path)
+			return True
+			
+			
+	def can_merge(self, p1, p2):
+		'''Return True iff path p1 and path p2 can merge.
+		Requirements:
+			- these paths cannot have any roads in common
+		'''
+		
+		p1_roads = set(p1)
+		p1_roads.update(set(reversed(p1)))
+		p2_roads = set(p2)
+		p2_roads.update(set(reversed(p2)))
+		
+		return len(p1_roads.intersection(p2_roads)) == 0
 				
 	def queue_road(self, v1, v2):
 		self._road_list.append((v1, v2))
@@ -76,7 +124,9 @@ class Graph():
 		self.p = tuple([]) # the current path
 		self._pi = 0 # the index along that path
 		self._v = set([]) # set of visited roads
-		self._ps = set([]) # set of added paths
+		if len(self._ps) > 0:
+			self._prev_ps = self._ps[:]
+		self._ps = [] # LIST!!! of added paths
 		self._n = None # next road to look at
 		self._a = None # current road
 		self._needs_reset = False # whether the whole thing has been stepped through
@@ -85,7 +135,12 @@ class Graph():
 		'''Return True iff there are more queued roads to add.'''
 		
 		return self._added_index < len(self._road_list)
-				
+		
+	def can_remove_road(self):
+		'''Return True iff there are more added roads to remove.'''
+	
+		return self._added_index > 0
+	
 	def add_road(self):
 		'''Add a queued road.
 		Many things reset.'''
@@ -99,7 +154,7 @@ class Graph():
 			return False
 		
 	def remove_last_road(self):
-		if self._added_index > 0:
+		if self.can_remove_road():
 			self._added_index -= 1
 			self.adjacent_remove(*self._road_list[self._added_index])
 			self.reset_path_search_vars()
@@ -125,7 +180,8 @@ class Graph():
 		'''assume this is all kosher.'''
 		
 		if (v1, v2) not in self.p:
-			self.p = self.p[:self._pi] + ((v1, v2), ) + self.p[self._pi + 1:]
+			# when you add a link, don't keep the stuff after the position of the link
+			self.p = self.p[:self._pi] + ((v1, v2), ) #+ self.p[self._pi + 1:]
 
 	def get_frontier(self):
 		frontier = set([(self._a[1], v) for v in self._adjacency_list[self._a[1]]])
@@ -136,11 +192,28 @@ class Graph():
 		return frontier
 		
 	def get_seed(self):
-		for v, adj_set in self._adjacency_list.iteritems():
-			if len(adj_set) == 1:
-				return (v, list(adj_set)[0])
-		k = self._adjacency_list.keys()[0] # random dude
-		return (k, list(self._adjacency_list[k])[0])
+		'''Return a starting road. Prefer roads with fewest links.
+		If no roads are added, return None.'''
+	
+		if self._added_index == 0:
+			return None
+			
+		choices = sorted(list(self._adjacency_list.items()), key=lambda item: len(item[1]))
+		
+		for v1, v2_set in choices:
+			for v2 in v2_set:
+				if (v1, v2) not in self._v:
+					return (v1, v2)
+		return None # all visited
+	
+		# old stuff
+		# for v, adj_set in self._adjacency_list.iteritems():
+			# if len(adj_set) == 1:
+				# link = (v, list(adj_set)[0])
+				# if link not in self._v:
+					# return link
+		# k = self._adjacency_list.keys()[0] # random dude
+		# return (k, list(self._adjacency_list[k])[0])
 		
 	def next_step(self):
 		if self._added_index == 0:
@@ -162,7 +235,7 @@ class Graph():
 			self._pi -= 1
 			self._v.add(self._a)
 			self._v.add(tuple(reversed(self._a)))
-			self._ps.add(self.p)
+			self.add_to_path_set(self.p)
 			
 			# print self._adjacency_list[self._a[0]]
 			# do a merge, but only if there is branching here
@@ -172,9 +245,19 @@ class Graph():
 				self.merge_at_node(self._a[0])
 			
 			if self._pi < 0:
-				self._needs_reset = True
-				return False # means we're done (back at the seed, and nowhere to go)
+				# start somewhere else
+				seed = self.get_seed()
+				if seed is None:
+					self._needs_reset = True
+					return False # means we're done (back at the seed, and nowhere to go)
+				else:
+					# keep ps the same, active node updated later, frontier updated later, keep visited same
+					self.p = tuple([]) # new path
+					self._pi = 0 # new index on path
+					self._seed = self._n = seed
+					return True # means we're not done yet
 			
+			# this has to be behind the exit check otherwise bad pointer on self.p
 			self._n = self.p[self._pi]
 			#self._front = False
 		else:
@@ -186,10 +269,16 @@ class Graph():
 		
 
 	def get_roads(self):
-		return self._road_list[:self._added_index]
+		return self.translate_roads(self._road_list[:self._added_index])
 		
 	def get_nodes(self):
-		return self._node_list
+		return self.translate_nodes(self._node_list)
+		
+	def get_node_label(self, index):
+		if self._translation is None:
+			return str(index)
+		else:
+			return str(self._node_list[index])
 		
 	def get_paths(self, compute_all=False):
 		'''Just return current state of this variable.'''
@@ -197,14 +286,17 @@ class Graph():
 		if compute_all:
 			while self.next_step():
 				pass
-			
-		return self._ps
+		
+		return [self.translate_roads(path) for path in self._ps]
 		
 	def get_longest_path_length(self, recompute=False):
 		if len(self._ps) == 0:
 			return 0
 		else:
-			return max(map(len, self._ps))
+			sorted_paths = sorted(self._ps, key=lambda p: len(p)) # make sure this is not in-place
+			print "Longest path = {}".format(sorted_paths[-1])
+			return len(sorted_paths[-1])
+			# return max(map(len, self._ps))
 			
 	def get_num_roads_placed(self):
 		return self._added_index
@@ -213,35 +305,40 @@ class Graph():
 		if self._a is None:
 			return None
 		else:
-			return self._a[0]
+			return self.translate_nodes([self._a[0]])[0]
+			
+	def translate_roads(self, roads):
+		if self._translation is None:
+			return roads
+		else:
+			return tuple([tuple([self._translation[node] for node in road]) for road in roads])
+			
+	def translate_nodes(self, nodes):
+		if self._translation is None:
+			return nodes
+		else:
+			return [self._translation[node] for node in nodes]
 		
 	def get_frontier_nodes(self):
-		return [road[0] for road in self._f]
+		return self.translate_nodes([road[0] for road in self._f])
 		
 	def get_visited_nodes(self):
-		return [road[0] for road in self._v]
+		return self.translate_nodes([road[0] for road in self._v])
 		
 if __name__ == "__main__":	
 	g = Graph()
 	# load_loop(g)
-	load_long_line(g)
+	load_ship_wheel(g)
+	
+	while g.add_road():
+		pass
+		
+	# print g.get_seed()
+	# exit(0)
 	
 	s = ""
 	keep_going = True
-	debug = True
-	
-	# there are only 2 roads
-	g.add_road()
-	#g.add_road()
-	
-	# now there are 3 roads
-	#g.add_road()
-	
-	# and 4....
-	#g.add_road()
-	
-	# and 5...
-	#g.add_road()
+	debug = False
 	
 	if debug:
 		while s != "quit" and keep_going:
