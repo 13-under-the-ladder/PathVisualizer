@@ -72,31 +72,40 @@ class Graph():
 			self._node_list.append(v)
 				
 	def reset_path_search_vars(self):
-		self._f = set([])
-		self.p = tuple([])
-		self._pi = 0
-		self._v = set([])
-		self._ps = set([])
-		self._n = None
-		self._a = None
-		self._needs_reset = False
+		self._f = set([]) # the frontier set of roads (only useful for visual debugger; this is culled to get self._n)
+		self.p = tuple([]) # the current path
+		self._pi = 0 # the index along that path
+		self._v = set([]) # set of visited roads
+		self._ps = set([]) # set of added paths
+		self._n = None # next road to look at
+		self._a = None # current road
+		self._needs_reset = False # whether the whole thing has been stepped through
+				
+	def can_add_road(self):
+		'''Return True iff there are more queued roads to add.'''
+		
+		return self._added_index < len(self._road_list)
 				
 	def add_road(self):
 		'''Add a queued road.
 		Many things reset.'''
-		
-		self.reset_path_search_vars()
-	
-		if self._added_index < len(self._road_list):
+			
+		if self.can_add_road():
 			self.adjacent_add(*self._road_list[self._added_index])
 			self._added_index += 1
+			self.reset_path_search_vars()
+			return True
 		else:
-			print "no"
+			return False
 		
-	def remove_road(self):
-		self.adjacent_remove(*self._road_list[self._added_index])
-		self._added_index -= 1
-				
+	def remove_last_road(self):
+		if self._added_index > 0:
+			self._added_index -= 1
+			self.adjacent_remove(*self._road_list[self._added_index])
+			self.reset_path_search_vars()
+			return True
+		else:
+			return False
 	def adjacent_remove(self, v1, v2):
 		self._adjacency_list[v1].discard(v2)
 		self._adjacency_list[v2].discard(v1)
@@ -182,11 +191,12 @@ class Graph():
 	def get_nodes(self):
 		return self._node_list
 		
-	def get_paths(self):
+	def get_paths(self, compute_all=False):
 		'''Just return current state of this variable.'''
 	
-		#while self.next_step():
-		#	pass
+		if compute_all:
+			while self.next_step():
+				pass
 			
 		return self._ps
 		

@@ -23,7 +23,7 @@ class PathDrawer(Frame):
 	_road_offset = 3
 	
 	# colors for paths
-	_path_colors = ["red", "orange",  "purple", "cyan", "green", "grey", "lightgreen", "yellow", "blue"]
+	_path_colors = ["black", "orange",  "purple", "cyan", "green", "grey", "lightgreen", "yellow", "blue"]
 	
 	_node_colors = {
 		"unvisited" : "white",
@@ -112,7 +112,7 @@ class PathDrawer(Frame):
 			
 			
 		node = self._engine.get_active_node()
-		print "Active node = {}".format(node)
+		# print "Active node = {}".format(node)
 		if node is not None:
 			i = nodes.index(node)
 			self.set_node_state(i, "active")
@@ -124,24 +124,34 @@ class PathDrawer(Frame):
 		more = self._engine.next_step()
 		self.update_nodes()
 		self.set_longest_road_length()
+		self.redraw_graph()
 		
 		if not more:
 			self._road_step_button.config(text="Stop Visual Debugger")
 			self._road_step_button.config(command=self.disable_vis_debugger)
 			
 	def enable_vis_debugger(self):
+		# configure this button to step through
 		self._road_step_button.config(text="Step")
 		self._road_step_button.config(command=self.next_step)
+		# update the label
 		self._visual_debugger_status_label.set("Visual debugger is on")
+		# reset the graph
+		self._engine.reset_path_search_vars()
+		self.update_nodes()
+		self.set_longest_road_length()
+		self.redraw_graph()
 		
 	def disable_vis_debugger(self):
+		# configure this button to re-enable debugger on next path add/remove
 		self._road_step_button.config(text="Start Visual Debugger")
 		self._road_step_button.config(command=self.enable_vis_debugger)
 		self._road_step_button.config(state=DISABLED)
+		# update associated label
 		self._visual_debugger_status_label.set("Visual debugger is off")
-		self._engine.reset_path_search_vars()
-		self.update_nodes()
-		self.redraw_graph()
+		#self._engine.reset_path_search_vars()
+		#self.update_nodes()
+		#self.redraw_graph()
 		
 	def add_next_road(self):
 		'''Show the addition of another path.
@@ -150,16 +160,22 @@ class PathDrawer(Frame):
 		self._engine.add_road()
 		self._road_step_button.config(state=NORMAL)
 		
+		while self._engine.next_step():
+			pass
+		
+		self.set_longest_road_length()
 		self.update_nodes()
 		self.redraw_graph()
+		
+		if not self._engine.can_add_road():
+			self._road_button.config(state=DISABLED)
 		
 			
 	def draw_paths(self):
 		'''Draw all the paths as a series of roads.
 		Each path is represented by a different color.'''
 		
-		print "There are {} paths".format(self._engine.get_paths())
-		
+		# print "There are {} paths".format(self._engine.get_paths())
 		
 		for path_index, path in enumerate(self._engine.get_paths()):
 			#for road_index in range(len(path) - 1):
@@ -186,12 +202,9 @@ class PathDrawer(Frame):
 		
 		self._engine.remove_last_road()
 		self.set_longest_road_length()
-		
-		# remove the paths already on the canvas
-		for item in self._canvas.find_withtag("path"):
-			self._canvas.delete(item)
-			
-		self.draw_paths()
+		self.update_nodes()
+		self.set_longest_road_length()
+		self.redraw_graph()
 		
 	def add_road_buttons(self):
 		'''Add a button to control addition of new roads.'''

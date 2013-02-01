@@ -2,7 +2,7 @@ from path_graphics import PathDrawer
 #from path_engine import PathEngine
 from Tkinter import Tk
 # from graph import Graph
-from q import Graph
+from graph import Graph
 from graph_creator import *
 
 '''
